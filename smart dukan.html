@@ -1,0 +1,2309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDukaan | ShopKeeper Pro</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Baloo+2:wght@700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK v8 (Legacy Namespaced SDK is easiest to integrate in a single HTML file) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        :root {
+            --teal: #00A79D;
+            --blue: #0079D9;
+            --gradient: linear-gradient(135deg, #00A79D 0%, #0079D9 100%);
+            --dark: #2c3e50;
+            --light: #f4f7f6;
+            --white: #ffffff;
+            --shadow: 0 4px 15px rgba(0,0,0,0.1);
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f1c40f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+            overflow-x: hidden;
+        }
+
+        /* --- UTILITIES --- */
+        .hidden { display: none !important; }
+        .card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: 0.3s; }
+        .btn-primary { background: var(--gradient); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { border: 2px solid var(--teal); color: var(--teal); background: transparent; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; width: 100%; font-size: 14px; }
+
+        /* --- AUTH SCREEN --- */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--gradient); z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 20px; width: 90%; max-width: 400px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .login-box h1 { font-family: 'Baloo 2', cursive; color: var(--teal); font-size: 2.5rem; margin-bottom: 20px; }
+
+        /* --- NAVIGATION --- */
+        header {
+            background: var(--gradient); color: white; padding: 10px 5%;
+            position: sticky; top: 0; z-index: 900;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .logo { font-family: 'Baloo 2', cursive; font-size: 1.8rem; }
+        nav { display: block; }
+        nav ul { display: flex; list-style: none; gap: 20px; }
+        nav ul li { cursor: pointer; font-weight: 500; opacity: 0.9; font-size: 0.9rem; }
+        nav ul li:hover, nav ul li.active { opacity: 1; border-bottom: 2px solid white; }
+        .user-controls { display: flex; align-items: center; gap: 15px; }
+
+        /* --- MAIN CONTENT --- */
+        main { padding: 30px 5%; max-width: 1200px; margin: 0 auto; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        
+        /* --- DASHBOARD --- */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 25px; border-radius: 15px; text-align: center; border-bottom: 5px solid var(--teal); }
+        .stat-card h3 { font-size: 2rem; color: var(--blue); }
+        .stat-card p { font-size: 0.9rem; color: #666; font-weight: 600; }
+
+        .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .action-card { 
+            background: white; padding: 20px; border-radius: 12px; display: flex; align-items: center; gap: 15px; 
+            cursor: pointer; transition: 0.3s; border: 1px solid #eee;
+        }
+        .action-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
+        .action-icon { font-size: 2rem; background: #e0f2f1; padding: 10px; border-radius: 10px; }
+
+        /* --- TABLES & LISTS --- */
+        .search-bar { width: 100%; max-width: 400px; margin-bottom: 20px; }
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .item-card { position: relative; }
+        .badge { position: absolute; top: 10px; right: 10px; padding: 4px 8px; border-radius: 5px; font-size: 0.7rem; font-weight: bold; }
+        .badge-low { background: #ffebee; color: var(--danger); }
+        .badge-stock { background: #e8f5e9; color: var(--success); }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center; z-index: 1001;
+        }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            header { flex-direction: column; gap: 12px; padding: 15px; width: 100%; }
+            nav { 
+                width: 100%; 
+                overflow-x: auto; 
+                -webkit-overflow-scrolling: touch; 
+                -ms-overflow-style: none;  /* IE and Edge */
+                scrollbar-width: none;  /* Firefox */
+            }
+            nav::-webkit-scrollbar {
+                display: none;  /* Chrome, Safari and Opera */
+            }
+            nav ul { display: flex; flex-wrap: nowrap; gap: 15px; padding-bottom: 5px; width: max-content; }
+            nav ul li { font-size: 0.85rem; flex-shrink: 0; }
+            .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- AUTHENTICATION OVERLAY -->
+    <div id="login-overlay">
+        <div class="login-box" style="max-width: 420px; width: 92%;">
+            <h1>SmartDukaan</h1>
+            <p style="margin-bottom: 20px; color: #666;">ShopKeeper Pro Authentication</p>
+            
+            <!-- STEP 1: MOBILE ENTRY -->
+            <div id="auth-phone-step">
+                <label style="font-weight: 500; font-size: 0.9rem; text-align: left; display: block; margin-bottom: 5px;" data-en="Enter Mobile Number" data-hi="मोबाइल नंबर दर्ज करें">Enter Mobile Number</label>
+                <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <input type="text" id="phone-country-code" value="+91" style="width: 65px; text-align: center; margin-bottom: 0;" placeholder="+91">
+                    <input type="tel" id="phone-number" placeholder="Mobile Number (10 digits)" style="margin-bottom: 0;" required>
+                </div>
+                
+                <!-- Invisible Captcha Container -->
+                <div id="recaptcha-container" style="margin-bottom: 15px;"></div>
+                
+                <button class="btn btn-primary" style="width: 100%;" onclick="sendOTP()" id="btn-send-otp" data-en="Send OTP" data-hi="ओटीपी भेजें">Send OTP</button>
+            </div>
+
+            <!-- STEP 2: OTP VERIFICATION -->
+            <div id="auth-otp-step" class="hidden">
+                <label style="font-weight: 500; font-size: 0.9rem; text-align: left; display: block; margin-bottom: 5px;" data-en="Enter OTP Verification Code" data-hi="ओटीपी सत्यापन कोड दर्ज करें">Enter OTP Verification Code</label>
+                <input type="number" id="otp-code" placeholder="6-digit OTP code" style="margin-bottom: 15px;" required>
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 10px;" onclick="verifyOTP()" data-en="Verify OTP & Login" data-hi="ओटीपी सत्यापित करें और लॉगिन करें">Verify OTP & Login</button>
+                <button class="btn btn-outline" style="width: 100%;" onclick="resendPhoneStep()" data-en="Back" data-hi="पीछे जाएं">Back</button>
+            </div>
+
+            <div style="margin: 20px 0; display: flex; align-items: center; justify-content: center; gap: 10px; color: #888;">
+                <hr style="flex: 1; border-color: #eee;">
+                <span style="font-size: 0.8rem;" data-en="OR" data-hi="या">OR</span>
+                <hr style="flex: 1; border-color: #eee;">
+            </div>
+
+            <!-- GOOGLE SIGN-IN BUTTON -->
+            <button class="btn btn-outline" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;" onclick="handleGoogleLogin()">
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.76 2.13c1.61-1.49 2.54-3.69 2.54-6.46z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.76-2.13c-.76.51-1.74.82-3.2.82-2.46 0-4.55-1.66-5.3-3.89L.94 13.06C2.42 16 5.46 18 9 18z" fill="#34A853"/>
+                    <path d="M3.7 10.62c-.19-.57-.3-1.18-.3-1.8 0-.62.11-1.23.3-1.8L.94 4.54C.34 5.73 0 7.08 0 8.8c0 1.72.34 3.07.94 4.26l2.76-2.44z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.8 11.43 0 9 0 5.46 0 2.42 2 .94 4.94l2.76 2.44c.75-2.23 2.84-3.8 5.3-3.8z" fill="#EA4335"/>
+                </svg>
+                <span data-en="Sign in with Google" data-hi="Google के साथ साइन इन करें">Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN UI -->
+    <div id="app-shell" class="hidden">
+        <header>
+            <div class="logo">SmartDukaan</div>
+            <nav>
+                <ul>
+                    <li onclick="showSection('dashboard')" id="nav-dashboard" class="active" data-en="Dashboard" data-hi="डैशबोर्ड">Dashboard</li>
+                    <li onclick="showSection('inventory')" id="nav-inventory" data-en="Inventory" data-hi="स्टॉक">Inventory</li>
+                    <li onclick="showSection('udhari')" id="nav-udhari" data-en="Udhari Record" data-hi="उधारी खाता">Udhari Record</li>
+                    <li onclick="showSection('delivery')" id="nav-delivery" data-en="Home Delivery" data-hi="होम डिलीवरी">Home Delivery</li>
+                    <li onclick="showSection('earnings')" id="nav-earnings" data-en="Earnings" data-hi="कमाई">Earnings</li>
+                    <li onclick="showSection('earningsHistory')" id="nav-earningsHistory" data-en="Earnings History" data-hi="कमाई का इतिहास">Earnings History</li>
+                </ul>
+            </nav>
+            <div class="user-controls">
+                <span id="welcome-user" style="font-weight: 500; font-size: 0.8rem;"></span>
+                <button class="btn" style="background: rgba(255,255,255,0.2); color: white; padding: 5px 10px;" onclick="openProfileModal()">👤 Profile</button>
+                <button class="btn" style="background: rgba(255,255,255,0.2); color: white; padding: 5px 10px;" onclick="toggleLanguage()" id="lang-btn">हिंदी</button>
+                <button class="btn btn-danger" style="padding: 5px 10px;" onclick="handleLogout()" data-en="Logout" data-hi="लॉगआउट">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- MIGRATION IMPORT BANNER -->
+            <div id="migration-banner" class="card hidden" style="background: #fff8e1; border: 1px solid #ffe082; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="color: #b78103;" data-en="Local Offline Data Detected" data-hi="स्थानीय ऑफ़लाइन डेटा मिला">Local Offline Data Detected</strong>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;" data-en="Would you like to import your offline shop records into this Firebase cloud account?" data-hi="क्या आप अपने ऑफ़लाइन दुकान के रिकॉर्ड को इस फ़ायरबेस क्लाउड खाते में आयात करना चाहते हैं?">Would you like to import your offline shop records into this Firebase cloud account?</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-primary" onclick="handleMigrationImport()" data-en="Import Data" data-hi="डेटा आयात करें">Import Data</button>
+                    <button class="btn btn-outline" onclick="dismissMigration()" style="border-color:#b78103; color:#b78103;" data-en="Dismiss" data-hi="खारिज करें">Dismiss</button>
+                </div>
+            </div>
+
+            <!-- DASHBOARD SECTION -->
+            <section id="dashboard">
+                <div class="section-header">
+                    <h2 data-en="Business Overview" data-hi="व्यापार अवलोकन">Business Overview</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3 id="stat-total-items">0</h3>
+                        <p data-en="Total Items" data-hi="कुल आइटम">Total Items</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--danger);">
+                        <h3 id="stat-low-stock" style="color: var(--danger);">0</h3>
+                        <p data-en="Low Stock Alert" data-hi="कम स्टॉक चेतावनी">Low Stock Alert</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="stat-total-udhari">₹0</h3>
+                        <p data-en="Total Udhari" data-hi="कुल उधारी">Total Udhari</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--warning);">
+                        <h3 id="stat-pending-orders" style="color: var(--warning);">0</h3>
+                        <p data-en="Pending Deliveries" data-hi="लंबित डिलीवरी">Pending Deliveries</p>
+                    </div>
+                </div>
+
+                <!-- SALES GRAPH CONTAINER -->
+                <div class="card" style="margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 15px; color: var(--dark);" data-en="Monthly Earnings Trend" data-hi="मासिक कमाई का रुझान">Monthly Earnings Trend</h3>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="dashboard-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- QUICK SUMMARY CARD -->
+                <h3 style="margin-bottom: 20px;" data-en="Dashboard Quick Summary" data-hi="डैशबोर्ड त्वरित सारांश">Dashboard Quick Summary</h3>
+                <div class="stats-grid" id="dashboard-quick-summary" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <div class="stat-card" style="border-color: var(--teal);">
+                        <h3 id="summary-current-month">₹0</h3>
+                        <p data-en="Current Month Earnings" data-hi="वर्तमान महीने की कमाई">Current Month Earnings</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--blue);">
+                        <h3 id="summary-highest-month">₹0</h3>
+                        <p id="summary-highest-month-label" data-en="Highest Month: -" data-hi="उच्चतम महीना: -">Highest Month: -</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--success);">
+                        <h3 id="summary-lifetime">₹0</h3>
+                        <p data-en="Total Lifetime Earnings" data-hi="कुल जीवनकाल की कमाई">Total Lifetime Earnings</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--warning);">
+                        <h3 id="summary-average">₹0</h3>
+                        <p data-en="Average Monthly Earnings" data-hi="औसत मासिक कमाई">Average Monthly Earnings</p>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--dark);">
+                        <h3 id="summary-sales-count">0</h3>
+                        <p data-en="Total Transactions" data-hi="कुल लेनदेन संख्या">Total Transactions</p>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 20px;" data-en="Quick Actions" data-hi="त्वरित कार्रवाई">Quick Actions</h3>
+                <div class="quick-actions">
+                    <div class="action-card" onclick="openModal('inventory')">
+                        <div class="action-icon">📦</div>
+                        <div>
+                            <strong data-en="Add New Item" data-hi="नया आइटम जोड़ें">Add New Item</strong>
+                            <p style="font-size: 0.8rem; color: #666;" data-en="Update your inventory" data-hi="अपना स्टॉक अपडेट करें">Update your inventory</p>
+                        </div>
+                    </div>
+                    <div class="action-card" onclick="openModal('udhari')">
+                        <div class="action-icon">💸</div>
+                        <div>
+                            <strong data-en="Record Udhari" data-hi="उधारी लिखें">Record Udhari</strong>
+                            <p style="font-size: 0.8rem; color: #666;" data-en="Track customer credit" data-hi="ग्राहक क्रेडिट ट्रैक करें">Track customer credit</p>
+                        </div>
+                    </div>
+                    <div class="action-card" onclick="openModal('delivery')">
+                        <div class="action-icon">🚚</div>
+                        <div>
+                            <strong data-en="New Delivery" data-hi="नई डिलीवरी">New Delivery</strong>
+                            <p style="font-size: 0.8rem; color: #666;" data-en="Home delivery order" data-hi="होम डिलीवरी ऑर्डर">Home delivery order</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- INVENTORY SECTION -->
+            <section id="inventory" class="hidden">
+                <div class="section-header">
+                    <h2 data-en="Inventory Management" data-hi="स्टॉक प्रबंधन">Inventory Management</h2>
+                    <button class="btn btn-primary" onclick="openModal('inventory')" data-en="+ Add Product" data-hi="+ उत्पाद जोड़ें">+ Add Product</button>
+                </div>
+                <input type="text" class="search-bar" placeholder="Search products..." onkeyup="filterData('inventory', this.value)">
+                <div class="data-grid" id="inventory-list">
+                    <!-- Dynamic Content -->
+                </div>
+            </section>
+
+            <!-- UDHARI SECTION -->
+            <section id="udhari" class="hidden">
+                <div class="section-header">
+                    <h2 data-en="Udhari Ledger" data-hi="उधारी खाता">Udhari Ledger</h2>
+                    <button class="btn btn-primary" onclick="openModal('udhari')" data-en="+ Add Credit Entry" data-hi="+ नया उधारी खाता">+ Add Credit Entry</button>
+                </div>
+                <input type="text" class="search-bar" placeholder="Search customers..." onkeyup="filterData('udhari', this.value)">
+                <div class="data-grid" id="udhari-list">
+                    <!-- Dynamic Content -->
+                </div>
+            </section>
+
+            <!-- DELIVERY SECTION -->
+            <section id="delivery" class="hidden">
+                <div class="section-header">
+                    <h2 data-en="Home Delivery Orders" data-hi="होम डिलीवरी ऑर्डर">Home Delivery Orders</h2>
+                    <button class="btn btn-primary" onclick="openModal('delivery')" data-en="+ New Order" data-hi="+ नया ऑर्डर">+ New Order</button>
+                </div>
+                <input type="text" class="search-bar" placeholder="Search address/name..." onkeyup="filterData('delivery', this.value)">
+                <div class="data-grid" id="delivery-list">
+                    <!-- Dynamic Content -->
+                </div>
+            </section>
+
+            <!-- EARNINGS SECTION -->
+            <section id="earnings" class="hidden">
+                <div class="section-header">
+                    <h2 data-en="Earning Records" data-hi="कमाई का रिकॉर्ड">Earning Records</h2>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="saveCurrentMonthEarnings()" data-en="[ Save Current Month ]" data-hi="[ वर्तमान महीना सहेजें ]">[ Save Current Month ]</button>
+                        <button class="btn btn-danger" onclick="resetEarnings()" data-en="Reset Monthly Earning" data-hi="मासिक कमाई रीसेट करें">Reset Monthly Earning</button>
+                    </div>
+                </div>
+                <div class="card" style="text-align: center; background: var(--gradient); color: white;">
+                    <p data-en="Current Month Earnings" data-hi="वर्तमान महीने की कमाई">Current Month Earnings</p>
+                    <h1 id="total-earnings-val" style="font-size: 3rem;">₹0</h1>
+                </div>
+                <h3 style="margin-bottom: 15px;" data-en="Recent Sales Log" data-hi="हालिया बिक्री लॉग">Recent Sales Log</h3>
+                <div id="sales-log" class="card">
+                    <!-- Dynamic Logs -->
+                </div>
+            </section>
+
+            <!-- EARNINGS HISTORY SECTION -->
+            <section id="earningsHistory" class="hidden">
+                <div class="section-header">
+                    <h2 data-en="Earnings History & Analytics" data-hi="कमाई का इतिहास और विश्लेषण">Earnings History & Analytics</h2>
+                </div>
+
+                <!-- TOP SELLING PRODUCTS -->
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: var(--teal);" data-en="Top Selling Products" data-hi="सबसे ज्यादा बिकने वाले उत्पाद">Top Selling Products</h3>
+                    <div id="top-selling-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+                        <!-- Dynamic Analytics Cards -->
+                    </div>
+                </div>
+
+                <!-- SAVED MONTHS LIST -->
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: var(--blue);" data-en="Saved Monthly Records" data-hi="सहेजे गए मासिक रिकॉर्ड">Saved Monthly Records</h3>
+                    <input type="text" class="search-bar" id="history-search" placeholder="Search month or year..." onkeyup="filterHistory(this.value)">
+                    <div id="history-list" style="margin-top: 15px;">
+                        <!-- Dynamic History Records -->
+                    </div>
+                </div>
+
+                <!-- DATA BACKUP & RESTORE -->
+                <div class="card" style="border-top: 5px solid var(--warning);">
+                    <h3 style="margin-bottom: 15px; color: var(--dark);" data-en="Data Backup & Restore" data-hi="डेटा बैकअप और पुनर्स्थापना">Data Backup & Restore</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;" data-en="Export your shop database to a JSON file, or restore data from a previous backup file." data-hi="अपने दुकान के डेटाबेस को JSON फ़ाइल में निर्यात करें, या पिछले बैकअप फ़ाइल से डेटा पुनर्स्थापित करें।">Export your shop database to a JSON file, or restore data from a previous backup file.</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-outline" onclick="exportData()" data-en="Export Data" data-hi="डेटा निर्यात करें">Export Data</button>
+                        <label class="btn btn-primary" style="display: inline-block; cursor: pointer; text-align: center;" data-en="Import Data" data-hi="डेटा आयात करें">
+                            Import Data
+                            <input type="file" id="import-file-input" accept=".json" style="display: none;" onchange="importData(event)">
+                        </label>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- USER PROFILE MODAL -->
+    <div id="profile-modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px; color: var(--blue);" data-en="User Profile" data-hi="उपयोगकर्ता प्रोफ़ाइल">User Profile</h3>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #eee;">
+                <p style="margin-bottom: 10px;"><b>Login Identifier:</b> <span id="profile-identifier"></span></p>
+                <p style="margin-bottom: 10px; word-break: break-all;"><b>Firebase UID:</b> <span id="profile-uid" style="font-family: monospace; font-size: 0.85rem;"></span></p>
+                <p style="margin-bottom: 10px;"><b>Provider:</b> <span id="profile-provider" style="font-weight: 500; color: var(--teal);"></span></p>
+                <p><b>Status:</b> <span style="color: var(--success); font-weight: bold;">Online & Synced</span></p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-outline" style="flex:1" onclick="closeProfileModal()" data-en="Close" data-hi="बंद करें">Close</button>
+                <button type="button" class="btn btn-danger" style="flex:1" onclick="handleLogout()" data-en="Logout" data-hi="लॉगआउट">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP (GENERIC ADD) -->
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 id="modal-title" style="margin-bottom: 20px;">Add New</h3>
+            <form id="generic-form">
+                <div id="form-fields"></div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-outline" style="flex:1" onclick="closeModal()" data-en="Cancel" data-hi="रद्द करें">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1" data-en="Save Entry" data-hi="सुरक्षित करें">Save Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SELL PRODUCT MODAL -->
+    <div id="sell-modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px; color: var(--teal);" data-en="Sell Product" data-hi="उत्पाद बेचें">Sell Product</h3>
+            <div id="sell-modal-details" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee;">
+                <!-- Dynamically filled -->
+            </div>
+            <form id="sell-form" onsubmit="handleSellSubmit(event)">
+                <input type="hidden" id="sell-product-index">
+                <label style="font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 5px;" data-en="Quantity to Sell" data-hi="बेचने की मात्रा">Quantity to Sell</label>
+                <input type="number" id="sell-quantity" placeholder="e.g. 5" step="any" min="0.001" style="margin-bottom: 15px;" required oninput="updateSellModalRevenue()">
+                
+                <div style="background: #e0f2f1; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #b2dfdb;">
+                    <span style="font-size: 0.9rem; color: #0079D9; font-weight: 500;" data-en="Total Revenue:" data-hi="कुल कमाई:">Total Revenue:</span>
+                    <h2 id="sell-modal-revenue" style="color: var(--teal); font-size: 1.8rem; margin-top: 5px;">₹0.00</h2>
+                </div>
+                
+                <div id="sell-error-msg" style="color: var(--danger); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px; font-weight: 500;" class="hidden"></div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-outline" style="flex:1" onclick="closeSellModal()" data-en="Cancel" data-hi="रद्द करें">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1" data-en="Confirm Sell" data-hi="बिक्री की पुष्टि करें">Confirm Sell</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- RESTOCK PRODUCT MODAL -->
+    <div id="restock-modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px; color: var(--blue);" data-en="Restock Product" data-hi="उत्पाद रिस्टॉक करें">Restock Product</h3>
+            <div id="restock-modal-details" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee;">
+                <!-- Dynamically filled -->
+            </div>
+            <form id="restock-form" onsubmit="handleRestockSubmit(event)">
+                <input type="hidden" id="restock-product-index">
+                <label style="font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 5px;" data-en="Quantity to Add" data-hi="जोड़ने की मात्रा">Quantity to Add</label>
+                <input type="number" id="restock-quantity" placeholder="e.g. 10" step="any" min="0.001" style="margin-bottom: 15px;" required>
+                
+                <div id="restock-error-msg" style="color: var(--danger); font-size: 0.85rem; margin-top: -10px; margin-bottom: 15px; font-weight: 500;" class="hidden"></div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-outline" style="flex:1" onclick="closeRestockModal()" data-en="Cancel" data-hi="रद्द करें">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1" data-en="Add Stock" data-hi="स्टॉक जोड़ें">Add Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCAcGUBL2kYSN5ua3K4_HI2hMHkAdpGeZI",
+            authDomain: "smartdukan-674eb.firebaseapp.com",
+            projectId: "smartdukan-674eb",
+            storageBucket: "smartdukan-674eb.firebasestorage.app",
+            messagingSenderId: "601084727457",
+            appId: "1:601084727457:web:822ad6c6f82985094520e0"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        const auth = firebase.auth();
+        const fs = firebase.firestore();
+
+        // Enable Firestore Offline Persistence
+        fs.enablePersistence().catch((err) => {
+            if (err.code == 'failed-precondition') {
+                console.warn("Firestore persistence failed: multiple tabs open.");
+            } else if (err.code == 'unimplemented') {
+                console.warn("Firestore persistence is not supported by browser.");
+            }
+        });
+
+        // --- DATA STATE ---
+        let db = {
+            inventory: [],
+            udhari: [],
+            delivery: [],
+            earnings: 0,
+            salesLog: [],
+            lang: localStorage.getItem('sd_lang') || 'en',
+            monthlyEarnings: {},
+            monthlyTransactionCount: {},
+            earningsHistory: []
+        };
+
+        // Local cache snapshot in memory before overwriting with Firebase (used for migration)
+        const localBackupData = {
+            inventory: JSON.parse(localStorage.getItem('sd_inventory')) || [],
+            udhari: JSON.parse(localStorage.getItem('sd_udhari')) || [],
+            delivery: JSON.parse(localStorage.getItem('sd_delivery')) || [],
+            earnings: parseFloat(localStorage.getItem('sd_earnings')) || 0,
+            salesLog: JSON.parse(localStorage.getItem('sd_salesLog')) || [],
+            monthlyEarnings: JSON.parse(localStorage.getItem('sd_monthlyEarnings')) || {},
+            monthlyTransactionCount: JSON.parse(localStorage.getItem('sd_monthlyTransactionCount')) || {},
+            earningsHistory: JSON.parse(localStorage.getItem('sd_earningsHistory')) || []
+        };
+
+        let currentUser = null;
+        let salesChart = null;
+        let activeListeners = [];
+
+        // --- AUTH OBSERVER ---
+        function checkAuth() {
+            migrateData(); // Safe backwards compatibility mapping
+            
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    currentUser = user;
+                    await syncUserData(user);
+                } else {
+                    currentUser = null;
+                    unsubscribeAllListeners();
+                    showLoginOverlay();
+                }
+            });
+        }
+
+        function unsubscribeAllListeners() {
+            activeListeners.forEach(unsub => {
+                if (typeof unsub === 'function') {
+                    try { unsub(); } catch (e) { console.error("Error unsubscribing listener:", e); }
+                }
+            });
+            activeListeners = [];
+        }
+
+        function showLoginOverlay() {
+            document.getElementById('login-overlay').classList.remove('hidden');
+            document.getElementById('app-shell').classList.add('hidden');
+            document.getElementById('auth-phone-step').classList.remove('hidden');
+            document.getElementById('auth-otp-step').classList.add('hidden');
+            document.getElementById('phone-number').value = "";
+            document.getElementById('otp-code').value = "";
+
+            if (!window.recaptchaVerifier) {
+                try {
+                    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                        'size': 'invisible',
+                        'callback': (response) => {}
+                    });
+                } catch (err) {
+                    console.error("Failed to initialize recaptchaVerifier:", err);
+                }
+            }
+        }
+
+        // --- SYNC DATA FROM FIRESTORE (REAL-TIME SYNC) ---
+        async function syncUserData(user) {
+            const uid = user.uid;
+
+            try {
+                // 1. Create or Update User profile document with Server Timestamps and Schema Versioning
+                const profileRef = fs.doc(`users/${uid}`);
+                const profileDoc = await profileRef.get();
+                const now = firebase.firestore.FieldValue.serverTimestamp();
+
+                if (!profileDoc.exists) {
+                    await profileRef.set({
+                        uid: uid,
+                        phoneNumber: user.phoneNumber || user.email || "Unknown",
+                        createdAt: now,
+                        lastLogin: now,
+                        isMigrated: false,
+                        schemaVersion: 1
+                    });
+                } else {
+                    await profileRef.update({
+                        lastLogin: now,
+                        schemaVersion: 1
+                    });
+                }
+
+                // 2. Clear old listeners
+                unsubscribeAllListeners();
+
+                // 3. Attach onSnapshot listeners to collections
+                // a. Earnings (Doc)
+                const unsubEarnings = fs.doc(`users/${uid}/earnings/data`)
+                    .onSnapshot(doc => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            db.earnings = data.earnings || 0;
+                            db.monthlyEarnings = data.monthlyEarnings || {};
+                            db.monthlyTransactionCount = data.monthlyTransactionCount || {};
+                        } else {
+                            db.earnings = 0;
+                            db.monthlyEarnings = {};
+                            db.monthlyTransactionCount = {};
+                        }
+                        saveData();
+                        refreshSectionIfActive('dashboard');
+                        refreshSectionIfActive('earnings');
+                        refreshSectionIfActive('earningsHistory');
+                    }, err => {
+                        console.error("Earnings sync error:", err);
+                    });
+                activeListeners.push(unsubEarnings);
+
+                // b. Inventory (Collection)
+                const unsubInventory = fs.collection(`users/${uid}/inventory`)
+                    .onSnapshot(snapshot => {
+                        db.inventory = [];
+                        snapshot.forEach(doc => {
+                            db.inventory.push({ id: doc.id, ...doc.data() });
+                        });
+                        saveData();
+                        refreshSectionIfActive('inventory');
+                        refreshSectionIfActive('dashboard');
+                    }, err => {
+                        console.error("Inventory sync error:", err);
+                    });
+                activeListeners.push(unsubInventory);
+
+                // c. Udhari (Collection)
+                const unsubUdhari = fs.collection(`users/${uid}/udhari`)
+                    .onSnapshot(snapshot => {
+                        db.udhari = [];
+                        snapshot.forEach(doc => {
+                            db.udhari.push({ id: doc.id, ...doc.data() });
+                        });
+                        saveData();
+                        refreshSectionIfActive('udhari');
+                        refreshSectionIfActive('dashboard');
+                    }, err => {
+                        console.error("Udhari sync error:", err);
+                    });
+                activeListeners.push(unsubUdhari);
+
+                // d. Delivery (Collection)
+                const unsubDelivery = fs.collection(`users/${uid}/delivery`)
+                    .onSnapshot(snapshot => {
+                        db.delivery = [];
+                        snapshot.forEach(doc => {
+                            db.delivery.push({ id: doc.id, ...doc.data() });
+                        });
+                        saveData();
+                        refreshSectionIfActive('delivery');
+                        refreshSectionIfActive('dashboard');
+                    }, err => {
+                        console.error("Delivery sync error:", err);
+                    });
+                activeListeners.push(unsubDelivery);
+
+                // e. History (Collection)
+                const unsubHistory = fs.collection(`users/${uid}/history`)
+                    .onSnapshot(snapshot => {
+                        db.earningsHistory = [];
+                        snapshot.forEach(doc => {
+                            db.earningsHistory.push({ id: doc.id, ...doc.data() });
+                        });
+                        saveData();
+                        refreshSectionIfActive('earningsHistory');
+                    }, err => {
+                        console.error("History sync error:", err);
+                    });
+                activeListeners.push(unsubHistory);
+
+                // f. Sales Log (Collection)
+                const unsubSalesLog = fs.collection(`users/${uid}/salesLog`)
+                    .onSnapshot(snapshot => {
+                        db.salesLog = [];
+                        snapshot.forEach(doc => {
+                            db.salesLog.push(doc.data());
+                        });
+                        db.salesLog.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+                        saveData();
+                        refreshSectionIfActive('earnings');
+                        refreshSectionIfActive('earningsHistory');
+                        refreshSectionIfActive('dashboard');
+                    }, err => {
+                        console.error("SalesLog sync error:", err);
+                    });
+                activeListeners.push(unsubSalesLog);
+
+                // 4. Trigger Migration Offer Banner if LocalStorage has offline data and account is not migrated
+                const currentProfile = (await profileRef.get()).data();
+                const isMigrated = currentProfile ? currentProfile.isMigrated : false;
+                
+                const hasLocalData = localBackupData.inventory.length > 0 || 
+                                     localBackupData.udhari.length > 0 || 
+                                     localBackupData.delivery.length > 0;
+
+                if (hasLocalData && !isMigrated) {
+                    document.getElementById('migration-banner').classList.remove('hidden');
+                } else {
+                    document.getElementById('migration-banner').classList.add('hidden');
+                }
+
+                // Initialize App Layout
+                initApp();
+
+            } catch (err) {
+                console.error("Firestore sync failed (offline fallback active):", err);
+                // Fallback to cache
+                db.inventory = JSON.parse(localStorage.getItem('sd_inventory')) || [];
+                db.udhari = JSON.parse(localStorage.getItem('sd_udhari')) || [];
+                db.delivery = JSON.parse(localStorage.getItem('sd_delivery')) || [];
+                db.earnings = parseFloat(localStorage.getItem('sd_earnings')) || 0;
+                db.salesLog = JSON.parse(localStorage.getItem('sd_salesLog')) || [];
+                db.monthlyEarnings = JSON.parse(localStorage.getItem('sd_monthlyEarnings')) || {};
+                db.monthlyTransactionCount = JSON.parse(localStorage.getItem('sd_monthlyTransactionCount')) || {};
+                db.earningsHistory = JSON.parse(localStorage.getItem('sd_earningsHistory')) || [];
+                
+                initApp();
+            }
+        }
+
+        // --- FIRESTORE WRITE BATCH UTILITIES ---
+        async function commitInBatches(uid, items, pathPrefix) {
+            let batch = fs.batch();
+            let count = 0;
+            
+            for (const item of items) {
+                const ref = fs.doc(`users/${uid}/${pathPrefix}/${item.id}`);
+                batch.set(ref, item);
+                count++;
+                
+                if (count === 400) {
+                    await batch.commit();
+                    batch = fs.batch();
+                    count = 0;
+                }
+            }
+            if (count > 0) {
+                await batch.commit();
+            }
+        }
+
+        async function commitLogsInBatches(uid, logs) {
+            let batch = fs.batch();
+            let count = 0;
+            
+            for (const log of logs) {
+                const logId = log.id || generateUniqueId();
+                const ref = fs.doc(`users/${uid}/salesLog/${logId}`);
+                const logData = {
+                    ...log,
+                    id: logId,
+                    serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                batch.set(ref, logData);
+                count++;
+                
+                if (count === 400) {
+                    await batch.commit();
+                    batch = fs.batch();
+                    count = 0;
+                }
+            }
+            if (count > 0) {
+                await batch.commit();
+            }
+        }
+
+        // --- FIRESTORE MIGRATION WORKER ---
+        async function handleMigrationImport() {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+
+            try {
+                // Ensure all items in memory backup have unique IDs
+                localBackupData.inventory.forEach(item => {
+                    if (!item.id) item.id = generateUniqueId();
+                });
+                localBackupData.udhari.forEach(item => {
+                    if (!item.id) item.id = generateUniqueId();
+                });
+                localBackupData.delivery.forEach(item => {
+                    if (!item.id) item.id = generateUniqueId();
+                });
+                localBackupData.earningsHistory.forEach(item => {
+                    if (!item.id) item.id = item.monthKey || generateUniqueId();
+                });
+
+                // Write documents to Firestore using high-speed Batches
+                await commitInBatches(uid, localBackupData.inventory, 'inventory');
+                await commitInBatches(uid, localBackupData.udhari, 'udhari');
+                await commitInBatches(uid, localBackupData.delivery, 'delivery');
+                await commitInBatches(uid, localBackupData.earningsHistory, 'history');
+                await commitLogsInBatches(uid, localBackupData.salesLog);
+
+                await fs.doc(`users/${uid}/earnings/data`).set({
+                    earnings: localBackupData.earnings,
+                    monthlyEarnings: localBackupData.monthlyEarnings,
+                    monthlyTransactionCount: localBackupData.monthlyTransactionCount
+                });
+
+                // Update Profile state to prevent duplicate banner triggers
+                await fs.doc(`users/${uid}`).update({
+                    isMigrated: true
+                });
+
+                alert("Local data successfully imported into your account!");
+                document.getElementById('migration-banner').classList.add('hidden');
+                
+                // Refresh App State
+                await syncUserData(currentUser);
+
+            } catch (err) {
+                alert("Migration import failed: " + err.message);
+            }
+        }
+
+        async function dismissMigration() {
+            if (!currentUser) return;
+            try {
+                await fs.doc(`users/${currentUser.uid}`).update({
+                    isMigrated: true
+                });
+                document.getElementById('migration-banner').classList.add('hidden');
+            } catch (err) {
+                console.error("Dismiss migration failed:", err);
+            }
+        }
+
+        // --- AUTH ACTIONS ---
+        function sendOTP() {
+            const countryCode = document.getElementById('phone-country-code').value.trim();
+            const rawPhone = document.getElementById('phone-number').value.trim();
+
+            if (!rawPhone || rawPhone.length < 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+
+            const fullPhone = countryCode + rawPhone;
+            const appVerifier = window.recaptchaVerifier;
+
+            const btn = document.getElementById('btn-send-otp');
+            btn.disabled = true;
+            btn.innerText = db.lang === 'en' ? "Sending..." : "भेजा जा रहा है...";
+
+            auth.signInWithPhoneNumber(fullPhone, appVerifier)
+                .then((confirmationResult) => {
+                    window.confirmationResult = confirmationResult;
+                    document.getElementById('auth-phone-step').classList.add('hidden');
+                    document.getElementById('auth-otp-step').classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerText = db.lang === 'en' ? "Send OTP" : "ओटीपी भेजें";
+                }).catch((error) => {
+                    let errMsg = "Error sending OTP: " + error.message;
+                    if (error.code === 'auth/quota-exceeded') {
+                        errMsg = "SMS quota has been exceeded for this project. Please try Google Sign-In or try again later.";
+                    } else if (error.code === 'auth/invalid-phone-number') {
+                        errMsg = "Invalid phone number format. Please check the country code and number.";
+                    } else if (error.code === 'auth/too-many-requests') {
+                        errMsg = "Too many requests. Please wait a few minutes before requesting another code.";
+                    }
+                    alert(errMsg);
+                    btn.disabled = false;
+                    btn.innerText = db.lang === 'en' ? "Send OTP" : "ओटीपी भेजें";
+                    
+                    if (window.recaptchaVerifier) {
+                        try {
+                            window.recaptchaVerifier.render().then(widgetId => {
+                                if (window.grecaptcha && widgetId !== undefined) {
+                                    window.grecaptcha.reset(widgetId);
+                                }
+                            }).catch(err => console.warn("reCAPTCHA reset warning:", err));
+                        } catch (recaptchaErr) {
+                            console.error("reCAPTCHA reset error:", recaptchaErr);
+                        }
+                    }
+                });
+        }
+
+        function verifyOTP() {
+            const code = document.getElementById('otp-code').value.trim();
+            if (!code || code.length !== 6) {
+                alert("Please enter the 6-digit OTP code.");
+                return;
+            }
+
+            if (!window.confirmationResult || typeof window.confirmationResult.confirm !== 'function') {
+                alert("No OTP request is active. Please request a new OTP before verifying.");
+                document.getElementById('auth-phone-step').classList.remove('hidden');
+                document.getElementById('auth-otp-step').classList.add('hidden');
+                return;
+            }
+
+            window.confirmationResult.confirm(code)
+                .then((result) => {
+                    // Logged in successfully, listener will execute
+                }).catch((error) => {
+                    let errMsg = "Verification failed: " + error.message;
+                    if (error.code === 'auth/invalid-verification-code') {
+                        errMsg = "The OTP code you entered is invalid. Please check the code and try again.";
+                    } else if (error.code === 'auth/code-expired') {
+                        errMsg = "The OTP code has expired. Please click 'Back' and request a new code.";
+                    }
+                    alert(errMsg);
+                });
+        }
+
+        function resendPhoneStep() {
+            document.getElementById('auth-phone-step').classList.remove('hidden');
+            document.getElementById('auth-otp-step').classList.add('hidden');
+            document.getElementById('otp-code').value = "";
+        }
+
+        function handleGoogleLogin() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {})
+                .catch((error) => {
+                    alert("Google Login Failed: " + error.message);
+                });
+        }
+
+        function handleLogout() {
+            unsubscribeAllListeners();
+            auth.signOut().then(() => {
+                location.reload();
+            }).catch((err) => {
+                alert("Logout Error: " + err.message);
+            });
+        }
+
+        // --- FIRESTORE WRITERS ---
+        async function saveToFirestore(collection, docId, data) {
+            if (!currentUser) return;
+            try {
+                await fs.doc(`users/${currentUser.uid}/${collection}/${docId}`).set(data);
+            } catch (err) {
+                console.warn("Firestore write queued (offline):", err);
+            }
+        }
+
+        async function deleteFromFirestore(collection, docId) {
+            if (!currentUser) return;
+            try {
+                await fs.doc(`users/${currentUser.uid}/${collection}/${docId}`).delete();
+            } catch (err) {
+                console.warn("Firestore delete queued (offline):", err);
+            }
+        }
+
+        // --- PROFILE MODAL ACTIONS ---
+        function openProfileModal() {
+            if (!currentUser) return;
+            document.getElementById('profile-identifier').innerText = currentUser.phoneNumber || currentUser.email || "N/A";
+            document.getElementById('profile-uid').innerText = currentUser.uid;
+            
+            const provider = currentUser.providerData[0] ? currentUser.providerData[0].providerId.toUpperCase() : "FIREBASE";
+            document.getElementById('profile-provider').innerText = provider;
+
+            document.getElementById('profile-modal-container').classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal-container').classList.add('hidden');
+        }
+
+        // --- DATA MIGRATION LOGIC (LOCAL STORAGE & OBJECT UPGRADE) ---
+        function migrateData(target = null) {
+            let migrated = false;
+            
+            // If no target provided, we migrate the global `db` state
+            const isGlobal = !target;
+            if (isGlobal) {
+                target = db;
+            }
+
+            if (Array.isArray(target.inventory)) {
+                target.inventory.forEach(item => {
+                    if (item.qty !== undefined && item.quantity === undefined) {
+                        let qtyStr = String(item.qty).trim();
+                        let num = parseFloat(qtyStr);
+                        if (isNaN(num)) num = 0;
+                        
+                        let unit = qtyStr.replace(/[0-9.]/g, '').trim();
+                        if (!unit) unit = 'pcs';
+                        
+                        item.quantity = num;
+                        item.unit = unit;
+                        delete item.qty;
+                        
+                        item.alert = parseFloat(item.alert) || 0;
+                        item.price = parseFloat(item.price) || 0;
+                        migrated = true;
+                    }
+                });
+            }
+
+            if (target.monthlySalesCount) {
+                target.monthlyTransactionCount = target.monthlySalesCount;
+                delete target.monthlySalesCount;
+                migrated = true;
+            }
+
+            const currentMonthKey = getCurrentMonthKey();
+            if (typeof target.monthlyEarnings !== 'object' || target.monthlyEarnings === null) {
+                target.monthlyEarnings = {};
+                migrated = true;
+            }
+            if (typeof target.monthlyTransactionCount !== 'object' || target.monthlyTransactionCount === null) {
+                target.monthlyTransactionCount = {};
+                migrated = true;
+            }
+            if (!Array.isArray(target.earningsHistory)) {
+                target.earningsHistory = [];
+                migrated = true;
+            }
+
+            if (Object.keys(target.monthlyEarnings).length === 0 && target.earnings > 0) {
+                target.monthlyEarnings[currentMonthKey] = target.earnings;
+                migrated = true;
+            }
+
+            if (Object.keys(target.monthlyTransactionCount).length === 0 && target.salesLog && target.salesLog.length > 0) {
+                target.salesLog.forEach(log => {
+                    const dateKey = log.date ? log.date.slice(0, 7) : currentMonthKey;
+                    target.monthlyTransactionCount[dateKey] = (target.monthlyTransactionCount[dateKey] || 0) + 1;
+                });
+                migrated = true;
+            }
+
+            if (isGlobal) {
+                saveData();
+                
+                // Keep LocalStorage keys in sync as secondary offline cache
+                let localInv = JSON.parse(localStorage.getItem('sd_inventory')) || [];
+                let localInvMigrated = false;
+                localInv.forEach(item => {
+                    if (item.qty !== undefined && item.quantity === undefined) {
+                        let qtyStr = String(item.qty).trim();
+                        let num = parseFloat(qtyStr);
+                        if (isNaN(num)) num = 0;
+                        let unit = qtyStr.replace(/[0-9.]/g, '').trim() || 'pcs';
+                        item.quantity = num;
+                        item.unit = unit;
+                        delete item.qty;
+                        item.alert = parseFloat(item.alert) || 0;
+                        item.price = parseFloat(item.price) || 0;
+                        localInvMigrated = true;
+                    }
+                });
+                if (localInvMigrated) {
+                    localStorage.setItem('sd_inventory', JSON.stringify(localInv));
+                }
+
+                if (localStorage.getItem('sd_monthlySalesCount')) {
+                    localStorage.setItem('sd_monthlyTransactionCount', localStorage.getItem('sd_monthlySalesCount'));
+                    localStorage.removeItem('sd_monthlySalesCount');
+                }
+            }
+
+            return migrated;
+        }
+
+        // --- NAVIGATION & UI ---
+        function initApp() {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+            
+            const welcomeText = currentUser ? (currentUser.phoneNumber || currentUser.email || "User") : "Shopkeeper";
+            document.getElementById('welcome-user').innerText = `👤 ${welcomeText}`;
+            renderDashboard();
+            applyLanguage();
+        }
+
+        function showSection(sectionId) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+            document.querySelectorAll('nav ul li').forEach(li => li.classList.remove('active'));
+            
+            const activeNav = document.getElementById('nav-' + sectionId);
+            if (activeNav) {
+                activeNav.classList.add('active');
+                // Scroll active nav item into view on mobile
+                activeNav.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+            
+            if(sectionId === 'dashboard') renderDashboard();
+            if(sectionId === 'inventory') renderInventory();
+            if(sectionId === 'udhari') renderUdhari();
+            if(sectionId === 'delivery') renderDelivery();
+            if(sectionId === 'earnings') renderEarnings();
+            if(sectionId === 'earningsHistory') renderEarningsHistory();
+        }
+
+        // --- REFRESH IN-PLACE FOR ACTIVE TABS ---
+        function refreshSectionIfActive(sectionName) {
+            const activeLi = document.querySelector('nav ul li.active');
+            if (!activeLi) return;
+            const currentActive = activeLi.id.replace('nav-', '');
+            
+            if (currentActive === sectionName) {
+                if (sectionName === 'dashboard') {
+                    renderDashboard();
+                } else if (sectionName === 'inventory') {
+                    const searchVal = document.querySelector('#inventory .search-bar')?.value || "";
+                    renderInventory(searchVal);
+                } else if (sectionName === 'udhari') {
+                    const searchVal = document.querySelector('#udhari .search-bar')?.value || "";
+                    renderUdhari(searchVal);
+                } else if (sectionName === 'delivery') {
+                    const searchVal = document.querySelector('#delivery .search-bar')?.value || "";
+                    renderDelivery(searchVal);
+                } else if (sectionName === 'earnings') {
+                    renderEarnings();
+                } else if (sectionName === 'earningsHistory') {
+                    const searchVal = document.getElementById('history-search')?.value || "";
+                    renderEarningsHistory(searchVal);
+                }
+            }
+        }
+
+        // --- SEARCH FILTER ROUTER ---
+        function filterData(type, val) {
+            if (type === 'inventory') renderInventory(val);
+            else if (type === 'udhari') renderUdhari(val);
+            else if (type === 'delivery') renderDelivery(val);
+        }
+
+        // --- CRUD HELPERS ---
+        function saveData() {
+            localStorage.setItem('sd_inventory', JSON.stringify(db.inventory));
+            localStorage.setItem('sd_udhari', JSON.stringify(db.udhari));
+            localStorage.setItem('sd_delivery', JSON.stringify(db.delivery));
+            localStorage.setItem('sd_earnings', db.earnings);
+            localStorage.setItem('sd_salesLog', JSON.stringify(db.salesLog));
+            localStorage.setItem('sd_monthlyEarnings', JSON.stringify(db.monthlyEarnings));
+            localStorage.setItem('sd_monthlyTransactionCount', JSON.stringify(db.monthlyTransactionCount));
+            localStorage.setItem('sd_earningsHistory', JSON.stringify(db.earningsHistory));
+        }
+
+        function formatCurrency(amount) {
+            return "₹" + (parseFloat(amount) || 0).toLocaleString();
+        }
+
+        function clearElement(element) {
+            while (element.firstChild) {
+                element.removeChild(element.firstChild);
+            }
+        }
+
+        function createEl(tag, options = {}) {
+            const element = document.createElement(tag);
+            if (options.className) element.className = options.className;
+            if (options.text !== undefined) element.textContent = options.text;
+            if (options.style) element.setAttribute('style', options.style);
+            if (options.attrs) {
+                Object.keys(options.attrs).forEach(key => element.setAttribute(key, options.attrs[key]));
+            }
+            return element;
+        }
+
+        function appendInfoLine(parent, label, value, prefix = "") {
+            const p = document.createElement('p');
+            if (prefix) p.appendChild(document.createTextNode(prefix + " "));
+            if (label) {
+                const strong = document.createElement('b');
+                strong.textContent = label;
+                p.appendChild(strong);
+                p.appendChild(document.createTextNode(" "));
+            }
+            p.appendChild(document.createTextNode(value == null ? "" : String(value)));
+            parent.appendChild(p);
+            return p;
+        }
+
+        function findRecordById(type, id) {
+            return db[type].find(item => item.id === id);
+        }
+
+        function getRecordIndexById(type, id) {
+            return db[type].findIndex(item => item.id === id);
+        }
+
+        async function addEarningsInTransaction(transaction, uid, amount, monthKey, transactionDelta = 1) {
+            const earningsRef = fs.doc(`users/${uid}/earnings/data`);
+            const earningsDoc = await transaction.get(earningsRef);
+            const current = earningsDoc.exists ? earningsDoc.data() : {};
+            const monthlyEarnings = { ...(current.monthlyEarnings || {}) };
+            const monthlyTransactionCount = { ...(current.monthlyTransactionCount || {}) };
+
+            monthlyEarnings[monthKey] = parseFloat(((monthlyEarnings[monthKey] || 0) + amount).toFixed(2));
+            monthlyTransactionCount[monthKey] = (monthlyTransactionCount[monthKey] || 0) + transactionDelta;
+
+            transaction.set(earningsRef, {
+                earnings: parseFloat(((current.earnings || 0) + amount).toFixed(2)),
+                monthlyEarnings: monthlyEarnings,
+                monthlyTransactionCount: monthlyTransactionCount
+            }, { merge: true });
+        }
+
+        // --- RENDERERS ---
+        function renderDashboard() {
+            document.getElementById('stat-total-items').innerText = db.inventory.length;
+            document.getElementById('stat-low-stock').innerText = db.inventory.filter(i => parseFloat(i.quantity) <= parseFloat(i.alert)).length;
+            const totalUdhari = db.udhari.reduce((acc, curr) => curr.status === 'pending' ? acc + parseFloat(curr.amount) : acc, 0);
+            document.getElementById('stat-total-udhari').innerText = formatCurrency(totalUdhari);
+            document.getElementById('stat-pending-orders').innerText = db.delivery.filter(d => d.status === 'pending').length;
+
+            // Trend Graph
+            renderDashboardChart();
+
+            // Quick Summary Metrics
+            const summary = getDashboardSummary();
+            document.getElementById('summary-current-month').innerText = formatCurrency(summary.currentMonth);
+            document.getElementById('summary-highest-month').innerText = formatCurrency(summary.highestMonthValue);
+            
+            const highestLabel = document.getElementById('summary-highest-month-label');
+            highestLabel.innerText = db.lang === 'en' ? `Highest Month: ${summary.highestMonthName}` : `उच्चतम महीना: ${summary.highestMonthName}`;
+            highestLabel.setAttribute('data-en', `Highest Month: ${summary.highestMonthName}`);
+            highestLabel.setAttribute('data-hi', `उच्चतम महीना: ${summary.highestMonthName}`);
+
+            document.getElementById('summary-lifetime').innerText = formatCurrency(summary.lifetime);
+            document.getElementById('summary-average').innerText = formatCurrency(Math.round(summary.average));
+            document.getElementById('summary-sales-count').innerText = summary.salesCount;
+        }
+
+        function renderInventory(filter = "") {
+            const container = document.getElementById('inventory-list');
+            clearElement(container);
+            db.inventory.filter(i => (i.name || '').toLowerCase().includes(filter.toLowerCase())).forEach((item) => {
+                const isLow = parseFloat(item.quantity) <= parseFloat(item.alert);
+                const card = document.createElement('div');
+                card.className = "card item-card";
+
+                card.appendChild(createEl('span', {
+                    className: `badge ${isLow ? 'badge-low' : 'badge-stock'}`,
+                    text: isLow ? 'Low Stock' : 'In Stock'
+                }));
+                card.appendChild(createEl('h3', { text: item.name, style: 'color:var(--teal)' }));
+                appendInfoLine(card, 'Category:', item.category);
+                appendInfoLine(card, 'Quantity:', `${item.quantity} ${item.unit}`);
+                appendInfoLine(card, 'Price:', formatCurrency(item.price));
+
+                const actions = createEl('div', { style: 'margin-top:15px; display:flex; gap:5px;' });
+                const sellBtn = createEl('button', {
+                    className: 'btn btn-primary',
+                    text: db.lang === 'en' ? 'Sell' : 'बेचें',
+                    style: 'flex:2; font-size:0.8rem;'
+                });
+                sellBtn.addEventListener('click', () => openSellModal(item.id));
+                const restockBtn = createEl('button', {
+                    className: 'btn btn-outline',
+                    text: db.lang === 'en' ? 'Restock' : 'रिस्टॉक',
+                    style: 'flex:2; font-size:0.8rem; border-color:var(--blue); color:var(--blue);'
+                });
+                restockBtn.addEventListener('click', () => openRestockModal(item.id));
+                const deleteBtn = createEl('button', {
+                    className: 'btn btn-outline',
+                    text: 'Delete',
+                    style: 'padding:5px 10px; flex:1;'
+                });
+                deleteBtn.addEventListener('click', () => deleteItem('inventory', item.id));
+                actions.appendChild(sellBtn);
+                actions.appendChild(restockBtn);
+                actions.appendChild(deleteBtn);
+                card.appendChild(actions);
+                container.appendChild(card);
+            });
+        }
+
+        function renderUdhari(filter = "") {
+            const container = document.getElementById('udhari-list');
+            clearElement(container);
+            db.udhari.filter(u => (u.name || '').toLowerCase().includes(filter.toLowerCase())).forEach((u) => {
+                const card = document.createElement('div');
+                card.className = "card";
+                const isOverdue = new Date(u.due) < new Date() && u.status === 'pending';
+
+                const header = createEl('div', { style: 'display:flex; justify-content:space-between' });
+                header.appendChild(createEl('h3', { text: u.name, style: 'color:var(--blue)' }));
+                header.appendChild(createEl('span', {
+                    text: String(u.status || '').toUpperCase(),
+                    style: `color:${u.status === 'paid' ? 'green' : 'red'}; font-weight:bold`
+                }));
+                card.appendChild(header);
+                appendInfoLine(card, '', u.phone, 'Phone:');
+                appendInfoLine(card, '', u.desc, 'Items:');
+                appendInfoLine(card, 'Amount:', formatCurrency(u.amount));
+                appendInfoLine(card, 'Due:', u.due).style.color = isOverdue ? 'red' : 'inherit';
+
+                const actions = createEl('div', { style: 'margin-top:15px; display:flex; gap:5px;' });
+                const statusBtn = createEl('button', {
+                    className: 'btn btn-primary',
+                    text: u.status === 'pending' ? 'Mark Paid' : 'Mark Pending',
+                    style: 'flex:1; font-size:0.8rem;'
+                });
+                statusBtn.addEventListener('click', () => toggleStatus('udhari', u.id));
+                const whatsappBtn = createEl('button', {
+                    className: 'btn btn-outline',
+                    text: 'WhatsApp',
+                    style: 'padding:5px 10px; border-color:#25D366'
+                });
+                whatsappBtn.addEventListener('click', () => sendWhatsApp(u.phone, u.amount));
+                const deleteBtn = createEl('button', {
+                    className: 'btn btn-outline',
+                    text: 'Delete',
+                    style: 'padding:5px 10px;'
+                });
+                deleteBtn.addEventListener('click', () => deleteItem('udhari', u.id));
+                actions.appendChild(statusBtn);
+                actions.appendChild(whatsappBtn);
+                actions.appendChild(deleteBtn);
+                card.appendChild(actions);
+                container.appendChild(card);
+            });
+        }
+
+        function renderDelivery(filter = "") {
+            const container = document.getElementById('delivery-list');
+            clearElement(container);
+            db.delivery.filter(d => (d.name || '').toLowerCase().includes(filter.toLowerCase()) || (d.address || '').toLowerCase().includes(filter.toLowerCase())).forEach((d) => {
+                const card = document.createElement('div');
+                card.className = "card";
+
+                const header = createEl('div', { style: 'display:flex; justify-content:space-between' });
+                header.appendChild(createEl('h3', { text: d.name, style: 'color:var(--teal)' }));
+                header.appendChild(createEl('span', {
+                    text: String(d.status || '').toUpperCase(),
+                    style: `color:${d.status === 'delivered' ? 'green' : 'orange'}; font-weight:bold`
+                }));
+                card.appendChild(header);
+                appendInfoLine(card, '', d.address, 'Address:');
+                appendInfoLine(card, '', d.phone, 'Phone:');
+                appendInfoLine(card, '', d.items, 'Items:');
+                appendInfoLine(card, 'Amount:', formatCurrency(d.amount));
+
+                const actions = createEl('div', { style: 'margin-top:15px; display:flex; gap:5px;' });
+                if (d.status === 'pending') {
+                    const deliveredBtn = createEl('button', {
+                        className: 'btn btn-primary',
+                        text: 'Mark Delivered',
+                        style: 'flex:1; font-size:0.8rem;'
+                    });
+                    deliveredBtn.addEventListener('click', () => toggleStatus('delivery', d.id));
+                    actions.appendChild(deliveredBtn);
+                }
+                const deleteBtn = createEl('button', {
+                    className: 'btn btn-outline',
+                    text: 'Delete',
+                    style: 'padding:5px 10px;'
+                });
+                deleteBtn.addEventListener('click', () => deleteItem('delivery', d.id));
+                actions.appendChild(deleteBtn);
+                card.appendChild(actions);
+                container.appendChild(card);
+            });
+        }
+
+        function renderEarnings() {
+            const currentMonthKey = getCurrentMonthKey();
+            const currentMonthEarnings = db.monthlyEarnings[currentMonthKey] || 0;
+            document.getElementById('total-earnings-val').innerText = formatCurrency(currentMonthEarnings);
+            
+            const logBox = document.getElementById('sales-log');
+            clearElement(logBox);
+            if (!db.salesLog.length) {
+                logBox.appendChild(createEl('p', { text: 'No sales records yet.' }));
+                return;
+            }
+            db.salesLog.slice(-15).reverse().forEach(log => {
+                const item = document.createElement('div');
+                item.style.padding = "10px";
+                item.style.borderBottom = "1px solid #eee";
+                const time = createEl('strong', { text: log.time || '' });
+                const amount = createEl('span', {
+                    text: '+' + formatCurrency(log.amt),
+                    style: 'float:right; color:green'
+                });
+                item.appendChild(time);
+                item.appendChild(document.createTextNode(` - ${log.msg || ''} `));
+                item.appendChild(amount);
+                logBox.appendChild(item);
+            });
+        }
+
+        function renderEarningsHistory(filter = "") {
+            renderTopSelling();
+
+            const container = document.getElementById('history-list');
+            clearElement(container);
+
+            let historyCopy = [...db.earningsHistory];
+            historyCopy.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+            let filtered = historyCopy.filter(h => {
+                const term = filter.toLowerCase();
+                return h.monthName.toLowerCase().includes(term) || h.monthKey.includes(term);
+            });
+
+            if (filtered.length === 0) {
+                container.appendChild(createEl('p', {
+                    text: 'No saved history found.',
+                    style: 'color:#888; text-align:center; padding:15px;'
+                }));
+                return;
+            }
+
+            filtered.forEach(h => {
+                const transactions = h.transactionCount || h.salesCount || 0;
+                const recordRow = document.createElement('div');
+                recordRow.style.padding = "15px";
+                recordRow.style.borderBottom = "1px solid #eee";
+                recordRow.style.display = "flex";
+                recordRow.style.justifyContent = "space-between";
+                recordRow.style.alignItems = "center";
+                const details = document.createElement('div');
+                details.appendChild(createEl('strong', {
+                    text: h.monthName,
+                    style: 'color:var(--dark); font-size:1.05rem;'
+                }));
+                details.appendChild(createEl('div', {
+                    text: `Saved on: ${h.dateSaved} | Transactions: ${transactions}`,
+                    style: 'font-size:0.8rem; color:#666; margin-top:3px;'
+                }));
+                recordRow.appendChild(details);
+                recordRow.appendChild(createEl('strong', {
+                    text: formatCurrency(h.totalEarnings),
+                    style: 'color:var(--success); font-size:1.2rem;'
+                }));
+                container.appendChild(recordRow);
+            });
+        }
+
+        function filterHistory(val) {
+            renderEarningsHistory(val);
+        }
+
+        // --- SALES ANALYTICS (TOP SELLING) ---
+        function renderTopSelling() {
+            const container = document.getElementById('top-selling-list');
+            clearElement(container);
+
+            let stats = {}; // { productName: { qty: 0, rev: 0 } }
+
+            db.salesLog.forEach(log => {
+                if (log.type && log.type !== 'sale') {
+                    return;
+                }
+                const parsed = parseOldSalesLog(log);
+                if (parsed) {
+                    const name = parsed.productName;
+                    const qtyVal = parsed.qty;
+                    const revenueVal = parseFloat(log.amt) || 0;
+
+                    if (!stats[name]) {
+                        stats[name] = { qty: 0, rev: 0 };
+                    }
+                    stats[name].qty += qtyVal;
+                    stats[name].rev += revenueVal;
+                }
+            });
+
+            let sorted = Object.keys(stats).map(name => ({
+                name: name,
+                qty: stats[name].qty,
+                rev: stats[name].rev
+            })).sort((a, b) => b.qty - a.qty);
+
+            if (sorted.length === 0) {
+                container.appendChild(createEl('p', {
+                    text: 'No product sales recorded yet.',
+                    style: 'color:#888; grid-column: 1/-1;'
+                }));
+                return;
+            }
+
+            sorted.slice(0, 6).forEach(item => {
+                const unit = getProductUnitByName(item.name);
+                const card = document.createElement('div');
+                card.style.background = "#f8f9fa";
+                card.style.padding = "15px";
+                card.style.borderRadius = "10px";
+                card.style.border = "1px solid #eee";
+                card.style.textAlign = "center";
+                card.appendChild(createEl('h4', {
+                    text: item.name,
+                    style: 'color:var(--dark); font-size:0.95rem; margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'
+                }));
+                card.appendChild(createEl('strong', {
+                    text: `${item.qty.toFixed(2).replace(/\.00$/, '')} ${unit}`,
+                    style: 'color:var(--teal); font-size:1.15rem; display:block;'
+                }));
+                card.appendChild(createEl('span', {
+                    text: formatCurrency(item.rev),
+                    style: 'color:var(--blue); font-size:0.9rem; font-weight:600; display:block; margin-top:5px;'
+                }));
+                container.appendChild(card);
+            });
+        }
+
+        function parseOldSalesLog(log) {
+            if (log.productName) {
+                return { productName: log.productName, qty: parseFloat(log.qty) || 0 };
+            }
+            if (log.msg && log.msg.startsWith("Sold ")) {
+                const parts = log.msg.substring(5).split(" ");
+                if (parts.length > 0) {
+                    const possibleQty = parseFloat(parts[0]);
+                    if (!isNaN(possibleQty) && parts.length > 1) {
+                        const name = parts.slice(1).join(" ");
+                        return { productName: name, qty: possibleQty };
+                    } else {
+                        const name = parts.join(" ");
+                        return { productName: name, qty: 1.0 };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function getProductUnitByName(name) {
+            const found = db.inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
+            return found ? found.unit : 'units';
+        }
+
+        // --- DASHBOARD ANALYTICS COMPUTATIONS ---
+        function getDashboardSummary() {
+            const currentMonthKey = getCurrentMonthKey();
+            const currentMonthEarnings = db.monthlyEarnings[currentMonthKey] || 0;
+
+            const keys = Object.keys(db.monthlyEarnings);
+            
+            let totalLifetime = 0;
+            let highestEarning = 0;
+            let highestMonthLabel = "N/A";
+            let totalSalesCount = 0;
+
+            keys.forEach(k => {
+                const val = db.monthlyEarnings[k] || 0;
+                totalLifetime += val;
+                if (val > highestEarning) {
+                    highestEarning = val;
+                    highestMonthLabel = formatMonthKey(k);
+                }
+                totalSalesCount += (db.monthlyTransactionCount[k] || 0);
+            });
+
+            const averageMonthly = keys.length > 0 ? (totalLifetime / keys.length) : 0;
+
+            return {
+                currentMonth: currentMonthEarnings,
+                highestMonthName: highestMonthLabel,
+                highestMonthValue: highestEarning,
+                lifetime: totalLifetime,
+                average: averageMonthly,
+                salesCount: totalSalesCount
+            };
+        }
+
+        // --- TREND LINE GRAPH ---
+        function renderDashboardChart() {
+            const ctx = document.getElementById('dashboard-chart');
+            if (!ctx) return;
+
+            let monthsKeys = Object.keys(db.monthlyEarnings);
+            const currentMonthKey = getCurrentMonthKey();
+            if (!monthsKeys.includes(currentMonthKey)) {
+                monthsKeys.push(currentMonthKey);
+            }
+
+            // Sort chronologically (oldest first)
+            monthsKeys.sort((a, b) => a.localeCompare(b));
+
+            const labels = monthsKeys.map(k => formatMonthKey(k));
+            const data = monthsKeys.map(k => db.monthlyEarnings[k] || 0);
+
+            // Compare data to prevent unnecessary redraws
+            if (salesChart) {
+                const oldLabels = salesChart.data.labels;
+                const oldData = salesChart.data.datasets[0].data;
+                if (JSON.stringify(oldLabels) === JSON.stringify(labels) && JSON.stringify(oldData) === JSON.stringify(data)) {
+                    return; // identical, skip to prevent flickering
+                }
+            }
+
+            if (salesChart) {
+                salesChart.destroy();
+            }
+
+            salesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Earnings (₹)',
+                        data: data,
+                        borderColor: '#00A79D',
+                        backgroundColor: 'rgba(0, 167, 157, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#0079D9',
+                        pointBorderColor: '#ffffff',
+                        pointHoverRadius: 7,
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                callback: function(value) {
+                                    return '₹' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- SAVE CURRENT MONTH ACTION ---
+        async function saveCurrentMonthEarnings() {
+            const currentMonthKey = getCurrentMonthKey();
+            const monthName = formatMonthKey(currentMonthKey);
+            const totalEarnings = db.monthlyEarnings[currentMonthKey] || 0;
+            const transactionCount = db.monthlyTransactionCount[currentMonthKey] || 0;
+
+            const now = new Date();
+            const dateSavedStr = now.toLocaleDateString() + " " + now.toLocaleTimeString();
+
+            const record = {
+                id: currentMonthKey,
+                monthKey: currentMonthKey,
+                monthName: monthName,
+                totalEarnings: totalEarnings,
+                transactionCount: transactionCount,
+                dateSaved: dateSavedStr
+            };
+
+            const existingIndex = db.earningsHistory.findIndex(h => h.monthKey === currentMonthKey);
+
+            if (existingIndex !== -1) {
+                alert(`${monthName} history record updated successfully with ₹${totalEarnings.toLocaleString()} (${transactionCount} transactions).`);
+            } else {
+                alert(`${monthName} earnings saved successfully with ₹${totalEarnings.toLocaleString()} (${transactionCount} transactions).`);
+            }
+
+            await saveToFirestore('history', record.id, record);
+        }
+
+        // --- RESTOCK ACTIONS ---
+        function openRestockModal(productId) {
+            const item = findRecordById('inventory', productId);
+            if (!item) {
+                alert("Product not found. Please refresh and try again.");
+                return;
+            }
+            document.getElementById('restock-product-index').value = productId;
+            const details = document.getElementById('restock-modal-details');
+            clearElement(details);
+            appendInfoLine(details, 'Product Name:', item.name).style.marginBottom = '8px';
+            appendInfoLine(details, 'Current Stock:', `${item.quantity} ${item.unit}`);
+            document.getElementById('restock-quantity').value = "";
+            document.getElementById('restock-error-msg').classList.add('hidden');
+            
+            applyLanguage();
+
+            document.getElementById('restock-modal-container').classList.remove('hidden');
+        }
+
+        function closeRestockModal() {
+            document.getElementById('restock-modal-container').classList.add('hidden');
+        }
+
+        async function handleRestockSubmit(event) {
+            event.preventDefault();
+            const productId = document.getElementById('restock-product-index').value;
+            const qtyToAdd = parseFloat(document.getElementById('restock-quantity').value);
+            const item = findRecordById('inventory', productId);
+            
+            const errorEl = document.getElementById('restock-error-msg');
+            errorEl.classList.add('hidden');
+
+            if (!item) {
+                errorEl.innerText = "Product not found. Please refresh and try again.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+                errorEl.innerText = "Please enter a valid quantity greater than zero.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const logRef = fs.collection(`users/${uid}/salesLog`).doc();
+            const logId = logRef.id;
+
+            try {
+                await fs.runTransaction(async (transaction) => {
+                const invRef = fs.doc(`users/${uid}/inventory/${item.id}`);
+                const invDoc = await transaction.get(invRef);
+                if (!invDoc.exists) {
+                    throw new Error("Product no longer exists.");
+                }
+                const currentItem = { id: invDoc.id, ...invDoc.data() };
+                const updatedItem = { ...currentItem };
+                updatedItem.quantity = parseFloat(((parseFloat(updatedItem.quantity) || 0) + qtyToAdd).toFixed(2));
+
+                transaction.set(invRef, updatedItem);
+                transaction.set(logRef, {
+                    id: logId,
+                    time: new Date().toLocaleTimeString(),
+                    date: new Date().toISOString().slice(0, 10),
+                    timestamp: new Date().toISOString(),
+                    msg: `Restocked ${qtyToAdd.toFixed(2).replace(/\.00$/, '')} ${currentItem.name}`,
+                    amt: 0,
+                    productName: currentItem.name,
+                    qty: qtyToAdd,
+                    type: 'restock',
+                    serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                });
+            } catch (err) {
+                errorEl.innerText = err.message || "Restock failed. Please try again.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            closeRestockModal();
+            alert(`Restocked ${qtyToAdd} ${item.unit} to ${item.name}!`);
+        }
+
+        // --- ADVANCED SELLING SYSTEM ---
+        function openSellModal(productId) {
+            const item = findRecordById('inventory', productId);
+            if (!item) {
+                alert("Product not found. Please refresh and try again.");
+                return;
+            }
+            document.getElementById('sell-product-index').value = productId;
+            const details = document.getElementById('sell-modal-details');
+            clearElement(details);
+            appendInfoLine(details, 'Product Name:', item.name).style.marginBottom = '8px';
+            appendInfoLine(details, 'Available Stock:', `${item.quantity} ${item.unit}`).style.marginBottom = '8px';
+            appendInfoLine(details, 'Price per Unit:', formatCurrency(item.price));
+            document.getElementById('sell-quantity').value = "";
+            document.getElementById('sell-modal-revenue').innerText = formatCurrency(0);
+            document.getElementById('sell-error-msg').classList.add('hidden');
+            
+            applyLanguage();
+
+            document.getElementById('sell-modal-container').classList.remove('hidden');
+        }
+
+        function closeSellModal() {
+            document.getElementById('sell-modal-container').classList.add('hidden');
+        }
+
+        function updateSellModalRevenue() {
+            const productId = document.getElementById('sell-product-index').value;
+            const qty = parseFloat(document.getElementById('sell-quantity').value);
+            const revenueEl = document.getElementById('sell-modal-revenue');
+
+            if (isNaN(qty) || qty <= 0) {
+                revenueEl.innerText = formatCurrency(0);
+                return;
+            }
+
+            const item = findRecordById('inventory', productId);
+            if (!item) {
+                revenueEl.innerText = formatCurrency(0);
+                return;
+            }
+            const total = qty * item.price;
+            revenueEl.innerText = formatCurrency(total.toFixed(2));
+        }
+
+        async function handleSellSubmit(event) {
+            event.preventDefault();
+            const productId = document.getElementById('sell-product-index').value;
+            const qtyToSell = parseFloat(document.getElementById('sell-quantity').value);
+            const item = findRecordById('inventory', productId);
+
+            const errorEl = document.getElementById('sell-error-msg');
+            errorEl.classList.add('hidden');
+
+            if (!item) {
+                errorEl.innerText = "Product not found. Please refresh and try again.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (isNaN(qtyToSell) || qtyToSell <= 0) {
+                errorEl.innerText = "Please enter a valid quantity greater than zero.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            if (qtyToSell > item.quantity) {
+                errorEl.innerText = `Insufficient stock! Only ${item.quantity} ${item.unit} available.`;
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const revenue = parseFloat((qtyToSell * item.price).toFixed(2));
+            const currentMonthKey = getCurrentMonthKey();
+            const logRef = fs.collection(`users/${uid}/salesLog`).doc();
+            const logId = logRef.id;
+
+            try {
+                await fs.runTransaction(async (transaction) => {
+                const invRef = fs.doc(`users/${uid}/inventory/${item.id}`);
+                const invDoc = await transaction.get(invRef);
+                if (!invDoc.exists) {
+                    throw new Error("Product no longer exists.");
+                }
+                const currentItem = { id: invDoc.id, ...invDoc.data() };
+                const currentQuantity = parseFloat(currentItem.quantity) || 0;
+                if (qtyToSell > currentQuantity) {
+                    throw new Error(`Insufficient stock! Only ${currentQuantity} ${currentItem.unit} available.`);
+                }
+                await addEarningsInTransaction(transaction, uid, revenue, currentMonthKey, 1);
+
+                const updatedItem = { ...currentItem };
+                updatedItem.quantity = parseFloat((currentQuantity - qtyToSell).toFixed(2));
+
+                transaction.set(invRef, updatedItem);
+                transaction.set(logRef, {
+                    id: logId,
+                    time: new Date().toLocaleTimeString(),
+                    date: new Date().toISOString().slice(0, 10),
+                    timestamp: new Date().toISOString(),
+                    msg: `Sold ${qtyToSell.toFixed(2).replace(/\.00$/, '')} ${currentItem.name}`,
+                    amt: revenue,
+                    productName: currentItem.name,
+                    qty: qtyToSell,
+                    type: 'sale',
+                    serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                });
+            } catch (err) {
+                errorEl.innerText = err.message || "Sale failed. Please try again.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            closeSellModal();
+            alert(`Sold ${qtyToSell} ${item.unit} of ${item.name} (+${formatCurrency(revenue)})`);
+        }
+
+        // --- UDHARI & DELIVERY STATUS CHANGES (BATCH WRITES) ---
+        async function toggleStatus(type, recordId) {
+            if (!currentUser) return;
+            const uid = currentUser.uid;
+            const currentMonthKey = getCurrentMonthKey();
+
+            try {
+            if(type === 'udhari') {
+                const logRef = fs.collection(`users/${uid}/salesLog`).doc();
+                const logId = logRef.id;
+
+                await fs.runTransaction(async (transaction) => {
+                    const udhariRef = fs.doc(`users/${uid}/udhari/${recordId}`);
+                    const udhariDoc = await transaction.get(udhariRef);
+                    if (!udhariDoc.exists) {
+                        throw new Error("Udhari record no longer exists.");
+                    }
+                    const item = { id: udhariDoc.id, ...udhariDoc.data() };
+                    const wasPaid = item.status === 'paid';
+                    const nextStatus = wasPaid ? 'pending' : 'paid';
+                    const shouldAddEarnings = nextStatus === 'paid' && item.paymentLogged !== true;
+
+                    if (shouldAddEarnings) {
+                        await addEarningsInTransaction(transaction, uid, parseFloat(item.amount) || 0, currentMonthKey, 1);
+                    }
+
+                    const updatedItem = {
+                        ...item,
+                        status: nextStatus,
+                        paymentLogged: item.paymentLogged === true || wasPaid || shouldAddEarnings
+                    };
+                    if (shouldAddEarnings) {
+                        updatedItem.paidAt = new Date().toISOString();
+                    }
+                    transaction.set(udhariRef, updatedItem);
+
+                    if (shouldAddEarnings) {
+                        transaction.set(logRef, {
+                            id: logId,
+                            time: new Date().toLocaleTimeString(),
+                            date: new Date().toISOString().slice(0, 10),
+                            timestamp: new Date().toISOString(),
+                            msg: `Udhari Paid by ${item.name}`,
+                            amt: parseFloat(item.amount) || 0,
+                            type: 'udhari_payment',
+                            sourceId: recordId,
+                            serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                });
+                
+            } else if(type === 'delivery') {
+                const logRef = fs.collection(`users/${uid}/salesLog`).doc();
+                const logId = logRef.id;
+
+                await fs.runTransaction(async (transaction) => {
+                    const deliveryRef = fs.doc(`users/${uid}/delivery/${recordId}`);
+                    const deliveryDoc = await transaction.get(deliveryRef);
+                    if (!deliveryDoc.exists) {
+                        throw new Error("Delivery record no longer exists.");
+                    }
+                    const item = { id: deliveryDoc.id, ...deliveryDoc.data() };
+                    if (item.status === 'delivered') {
+                        return;
+                    }
+
+                    await addEarningsInTransaction(transaction, uid, parseFloat(item.amount) || 0, currentMonthKey, 1);
+                    transaction.set(deliveryRef, { ...item, status: 'delivered', deliveredAt: new Date().toISOString() });
+                    transaction.set(logRef, {
+                        id: logId,
+                        time: new Date().toLocaleTimeString(),
+                        date: new Date().toISOString().slice(0, 10),
+                        timestamp: new Date().toISOString(),
+                        msg: `Delivery to ${item.name} completed`,
+                        amt: parseFloat(item.amount) || 0,
+                        type: 'delivery_completion',
+                        sourceId: recordId,
+                        serverTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+            }
+            } catch (err) {
+                alert(err.message || "Status update failed. Please try again.");
+                return;
+            }
+            showSection(type);
+        }
+
+        async function deleteItem(type, recordId) {
+            if(confirm("Are you sure?")) {
+                const item = findRecordById(type, recordId);
+                if (item && item.id) {
+                    const col = type === 'inventory' ? 'inventory' : (type === 'udhari' ? 'udhari' : 'delivery');
+                    await deleteFromFirestore(col, item.id);
+                }
+            }
+        }
+
+        async function resetEarnings() {
+            if(confirm("This will clear your current month earnings. Sales logs will remain. Continue?")) {
+                if (!currentUser) return;
+                const currentMonthKey = getCurrentMonthKey();
+
+                await fs.runTransaction(async (transaction) => {
+                    const earningsRef = fs.doc(`users/${currentUser.uid}/earnings/data`);
+                    const earningsDoc = await transaction.get(earningsRef);
+                    const current = earningsDoc.exists ? earningsDoc.data() : {};
+                    const newMonthlyEarnings = { ...(current.monthlyEarnings || {}) };
+                    newMonthlyEarnings[currentMonthKey] = 0;
+                    const newMonthlyTransactionCount = { ...(current.monthlyTransactionCount || {}) };
+                    newMonthlyTransactionCount[currentMonthKey] = 0;
+
+                    transaction.set(earningsRef, {
+                        earnings: 0,
+                        monthlyEarnings: newMonthlyEarnings,
+                        monthlyTransactionCount: newMonthlyTransactionCount
+                    }, { merge: true });
+                });
+            }
+        }
+
+        function sendWhatsApp(phone, amount) {
+            const normalizedPhone = normalizeWhatsAppNumber(phone);
+            if (!normalizedPhone) {
+                alert("Please enter a valid phone number before sending a WhatsApp reminder.");
+                return;
+            }
+            const msg = encodeURIComponent(`Namaste, this is a reminder from SmartDukaan regarding your pending payment of ${formatCurrency(amount)}. Please clear it at your earliest convenience.`);
+            window.open(`https://wa.me/${normalizedPhone}?text=${msg}`, '_blank');
+        }
+
+        function normalizeWhatsAppNumber(phone) {
+            let digits = String(phone || '').replace(/[^\d]/g, '');
+            if (digits.startsWith('00')) {
+                digits = digits.slice(2);
+            }
+            if (digits.length === 10) {
+                return '91' + digits;
+            }
+            if (digits.length > 10 && digits.length <= 15) {
+                return digits;
+            }
+            return '';
+        }
+
+        // --- BACKUP & RESTORE ---
+        function exportData() {
+            const dataStr = JSON.stringify(db, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileName = `smartdukaan_backup_${new Date().toISOString().slice(0,10)}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileName);
+            linkElement.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Import rollback protection: deep clone previous stable state
+            const dbBackup = JSON.parse(JSON.stringify(db));
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const importedDb = JSON.parse(e.target.result);
+                    
+                    if (typeof importedDb !== 'object' || importedDb === null) {
+                        throw new Error("Invalid format: must be a JSON object.");
+                    }
+                    
+                    const requiredKeys = ['inventory', 'udhari', 'delivery'];
+                    const missingKeys = requiredKeys.filter(k => !importedDb.hasOwnProperty(k));
+                    if (missingKeys.length > 0) {
+                        throw new Error("Invalid backup file: Missing key arrays: " + missingKeys.join(', '));
+                    }
+                    
+                    if (!Array.isArray(importedDb.inventory) || !Array.isArray(importedDb.udhari) || !Array.isArray(importedDb.delivery)) {
+                        throw new Error("Core fields (inventory, udhari, delivery) must be arrays.");
+                    }
+
+                    // Run in-memory migration first on imported data object
+                    migrateData(importedDb);
+
+                    // Map fields safely
+                    db.inventory = importedDb.inventory;
+                    db.udhari = importedDb.udhari;
+                    db.delivery = importedDb.delivery;
+                    db.earnings = parseFloat(importedDb.earnings) || 0;
+                    db.salesLog = importedDb.salesLog || [];
+                    db.monthlyEarnings = importedDb.monthlyEarnings || {};
+                    db.monthlyTransactionCount = importedDb.monthlyTransactionCount || {};
+                    db.earningsHistory = importedDb.earningsHistory || [];
+                    db.lang = importedDb.lang || db.lang || 'en';
+
+                    // Ensure all imported items have unique IDs
+                    ensureIds();
+                    saveData();
+
+                    // Push changes to Firestore asynchronously using fast batches
+                    if (currentUser) {
+                        const uid = currentUser.uid;
+                        await commitInBatches(uid, db.inventory, 'inventory');
+                        await commitInBatches(uid, db.udhari, 'udhari');
+                        await commitInBatches(uid, db.delivery, 'delivery');
+                        await commitInBatches(uid, db.earningsHistory, 'history');
+                        await commitLogsInBatches(uid, db.salesLog);
+                        
+                        await fs.doc(`users/${uid}/earnings/data`).set({
+                            earnings: db.earnings,
+                            monthlyEarnings: db.monthlyEarnings,
+                            monthlyTransactionCount: db.monthlyTransactionCount
+                        });
+                    }
+                    
+                    alert("Database restored successfully!");
+                    showSection(document.querySelector('nav ul li.active').id.replace('nav-', ''));
+                } catch (err) {
+                    // Rollback
+                    db = dbBackup;
+                    saveData();
+                    alert("Import Failed: " + err.message + ". Restored database to original state.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ""; // Clear input
+        }
+
+        // --- HELPERS ---
+        function getCurrentMonthKey() {
+            const now = new Date();
+            return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0');
+        }
+
+        function formatMonthKey(key) {
+            const [year, month] = key.split('-');
+            const monthNames = [
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            ];
+            return monthNames[parseInt(month) - 1] + " " + year;
+        }
+
+        function generateUniqueId() {
+            return 'id_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+        }
+
+        function ensureIds() {
+            db.inventory.forEach(item => {
+                if (!item.id) item.id = generateUniqueId();
+            });
+            db.udhari.forEach(item => {
+                if (!item.id) item.id = generateUniqueId();
+            });
+            db.delivery.forEach(item => {
+                if (!item.id) item.id = generateUniqueId();
+            });
+            db.earningsHistory.forEach(item => {
+                if (!item.id) item.id = item.monthKey || generateUniqueId();
+            });
+        }
+
+        // --- MODAL SYSTEM ---
+        function openModal(type) {
+            const fields = document.getElementById('form-fields');
+            const title = document.getElementById('modal-title');
+            fields.innerHTML = "";
+            
+            if(type === 'inventory') {
+                title.innerText = db.lang === 'en' ? "Add Inventory Item" : "नया स्टॉक आइटम जोड़ें";
+                fields.innerHTML = `
+                    <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Product Name" data-hi="उत्पाद का नाम">Product Name</label>
+                    <input type="text" id="f1" placeholder="Product Name (e.g. Rice)" required>
+                    
+                    <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Category" data-hi="श्रेणी">Category</label>
+                    <select id="f2">
+                        <option value="ration">Ration</option>
+                        <option value="liquid">Liquid/Oil</option>
+                        <option value="other">Other</option>
+                    </select>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom:10px;">
+                        <div style="flex: 2;">
+                            <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Quantity" data-hi="मात्रा">Quantity</label>
+                            <input type="number" id="f3" placeholder="Quantity (e.g. 50)" step="any" min="0" required>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Unit" data-hi="इकाई">Unit</label>
+                            <select id="f4">
+                                <option value="kg">kg</option>
+                                <option value="pcs">pcs</option>
+                                <option value="litre">litre</option>
+                                <option value="packet">packet</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Low Stock Alert Level" data-hi="कम स्टॉक चेतावनी स्तर">Low Stock Alert Level</label>
+                    <input type="number" id="f5" placeholder="Low Stock Alert Level (e.g. 5)" min="0" required>
+                    
+                    <label style="font-weight:500; font-size:0.9rem; display:block; margin-bottom:5px;" data-en="Price per unit (₹)" data-hi="प्रति इकाई मूल्य (₹)">Price per unit</label>
+                    <input type="number" id="f6" placeholder="Price per unit" step="any" min="0" required>
+                `;
+            } else if(type === 'udhari') {
+                title.innerText = db.lang === 'en' ? "Add Udhari Record" : "उधारी खाता जोड़ें";
+                fields.innerHTML = `
+                    <input type="text" id="f1" placeholder="Customer Name" required>
+                    <input type="text" id="f2" placeholder="Phone Number" required>
+                    <input type="text" id="f3" placeholder="Products Description" required>
+                    <input type="number" id="f4" placeholder="Amount (₹)" required>
+                    <input type="date" id="f5" required>
+                `;
+            } else if(type === 'delivery') {
+                title.innerText = db.lang === 'en' ? "New Delivery Order" : "नया डिलीवरी ऑर्डर";
+                fields.innerHTML = `
+                    <input type="text" id="f1" placeholder="Customer Name" required>
+                    <input type="text" id="f2" placeholder="Full Address" required>
+                    <input type="text" id="f3" placeholder="Phone Number" required>
+                    <input type="text" id="f4" placeholder="Items List" required>
+                    <input type="number" id="f5" placeholder="Total Amount (₹)" required>
+                `;
+            }
+
+            applyLanguage();
+
+            document.getElementById('modal-container').classList.remove('hidden');
+            document.getElementById('generic-form').onsubmit = (e) => {
+                e.preventDefault();
+                saveModalData(type);
+            };
+        }
+
+        function closeModal() {
+            document.getElementById('modal-container').classList.add('hidden');
+        }
+
+        async function saveModalData(type) {
+            const f1 = document.getElementById('f1').value;
+            const f2 = document.getElementById('f2').value;
+            const f3 = document.getElementById('f3').value;
+            const f4 = document.getElementById('f4').value;
+            const f5 = document.getElementById('f5').value;
+            const f6 = document.getElementById('f6') ? document.getElementById('f6').value : '';
+
+            const newId = generateUniqueId();
+
+            if(type === 'inventory') {
+                const item = { 
+                    id: newId,
+                    name: f1, 
+                    category: f2, 
+                    quantity: parseFloat(f3), 
+                    unit: f4, 
+                    alert: parseFloat(f5), 
+                    price: parseFloat(f6) 
+                };
+                closeModal();
+                showSection(type);
+                await saveToFirestore('inventory', newId, item);
+                
+            } else if(type === 'udhari') {
+                const item = { id: newId, name: f1, phone: f2, desc: f3, amount: parseFloat(f4), due: f5, status: 'pending' };
+                closeModal();
+                showSection(type);
+                await saveToFirestore('udhari', newId, item);
+                
+            } else if(type === 'delivery') {
+                const item = { id: newId, name: f1, address: f2, phone: f3, items: f4, amount: parseFloat(f5), status: 'pending' };
+                closeModal();
+                showSection(type);
+                await saveToFirestore('delivery', newId, item);
+            }
+        }
+
+        // Language translation helper functions
+        function applyLanguage() {
+            const lang = db.lang;
+            document.querySelectorAll('[data-en]').forEach(el => {
+                const translation = el.getAttribute('data-' + lang);
+                if (translation) {
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                        el.placeholder = translation;
+                    } else {
+                        el.innerText = translation;
+                    }
+                }
+            });
+            const langBtn = document.getElementById('lang-btn');
+            if (langBtn) {
+                langBtn.innerText = lang === 'en' ? 'हिंदी' : 'English';
+            }
+        }
+
+        function toggleLanguage() {
+            db.lang = db.lang === 'en' ? 'hi' : 'en';
+            localStorage.setItem('sd_lang', db.lang);
+            applyLanguage();
+            renderActiveSection();
+        }
+
+        function renderActiveSection() {
+            const activeLi = document.querySelector('nav ul li.active');
+            if (!activeLi) return;
+            const sectionId = activeLi.id.replace('nav-', '');
+            
+            if (sectionId === 'dashboard') renderDashboard();
+            else if (sectionId === 'inventory') {
+                const searchVal = document.querySelector('#inventory .search-bar')?.value || "";
+                renderInventory(searchVal);
+            }
+            else if (sectionId === 'udhari') {
+                const searchVal = document.querySelector('#udhari .search-bar')?.value || "";
+                renderUdhari(searchVal);
+            }
+            else if (sectionId === 'delivery') {
+                const searchVal = document.querySelector('#delivery .search-bar')?.value || "";
+                renderDelivery(searchVal);
+            }
+            else if (sectionId === 'earnings') renderEarnings();
+            else if (sectionId === 'earningsHistory') {
+                const searchVal = document.getElementById('history-search')?.value || "";
+                renderEarningsHistory(searchVal);
+            }
+        }
+
+        // Initial entry check
+        window.onload = checkAuth;
+        </script>
+</body>
+</html>
